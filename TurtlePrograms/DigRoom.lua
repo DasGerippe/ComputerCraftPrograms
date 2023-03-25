@@ -64,34 +64,42 @@ local function opposite(direction)
     end
 end
 
-local function digAndForward()
+local function digAndForward(digUp, digDown)
     while turtle.detect() do
         turtle.dig()
     end
-    turtle.forward()
-end
 
-local function digLane(length)
-    for currentLength = 1, length do
-        digAndForward()
+    turtle.forward()
+
+    if digUp then
+        turtle.digUp()
+    end
+    if digDown then
+        turtle.digDown()
     end
 end
 
-local function prepareNextLane(direction)
+local function digLane(length, digUp, digDown)
+    for currentLength = 1, length do
+        digAndForward(digUp, digDown)
+    end
+end
+
+local function prepareNextLane(direction, digUp, digDown)
     turn(direction)
-    digAndForward()
+    digAndForward(digUp, digDown)
     turn(direction)
 end
 
-local function digLayer(width, length, direction)
+local function digLayer(width, length, direction, digUp, digDown)
     for currentWidth = 1, width do
-        digLane(length - 1)
+        digLane(length - 1, digUp, digDown)
 
         if currentWidth ~= width then
             if currentWidth % 2 == 0 then
-                prepareNextLane(opposite(direction))
+                prepareNextLane(opposite(direction), digUp, digDown)
             else
-                prepareNextLane(direction)
+                prepareNextLane(direction, digUp, digDown)
             end
         end
     end
@@ -113,6 +121,34 @@ local function optimizeParameters(length, width, direction)
     end
 end
 
+local function checkForMultiLayerDigging(currentHeight, height, verticalDirection)
+    local digUp = false
+    local digDown = false
+
+    if currentHeight < height then
+        dig(verticalDirection)
+        move(verticalDirection)
+
+        if verticalDirection == "up" then
+            digDown = true
+        elseif verticalDirection == "down" then
+            digUp = true
+        end
+
+        if currentHeight + 1 < height then
+            dig(verticalDirection)
+
+            if verticalDirection == "up" then
+                digUp = true
+            elseif verticalDirection == "down" then
+                digDown = true
+            end
+        end
+    end
+
+    return digUp, digDown
+end
+
 --[[
 Start of program
 ]]--
@@ -125,10 +161,22 @@ local verticalDirection = readVerticalDirection("Vertical direction (up/down): "
 
 length, width, direction = optimizeParameters(length, width, direction)
 
-for currentHeight = 1, height do
-    digLayer(width, length, direction)
+local currentHeight = 1
+while currentHeight <= height do
+    local digUp, digDown = checkForMultiLayerDigging(currentHeight, height, verticalDirection)
 
-    if currentHeight ~= height then
+    digLayer(width, length, direction, digUp, digDown)
+
+    if digUp and digDown then
+        move(verticalDirection)
+        currentHeight = currentHeight + 3
+    elseif digUp or digDown then
+        currentHeight = currentHeight + 2
+    else
+        currentHeight = currentHeight + 1
+    end
+
+    if currentHeight <= height then
         prepareNextLayer(verticalDirection)
     
         if width % 2 == 0 then
